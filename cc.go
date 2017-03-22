@@ -75,19 +75,10 @@ func (t *SimpleChaincode) credit(stub shim.ChaincodeStubInterface, args []string
 	}
 	currentBal, _ = strconv.Atoi(string(custCurrentBalbytes))
 
-	// Bvalbytes, err := stub.GetState(B)
-	// if err != nil {
-	// 	return nil, errors.New("Failed to get state")
-	// }
-	// if Bvalbytes == nil {
-	// 	return nil, errors.New("Entity not found")
-	// }
-	// Bval, _ = strconv.Atoi(string(Bvalbytes))
-
+	
 	// Credit Execution
 	creditAmount, err = strconv.Atoi(args[1])
 	currentBal = currentBal + creditAmount
-	// Bval = Bval + X
 	fmt.Printf("currentBal = %d\n", currentBal)
 
 	// Write the state back to the ledger
@@ -95,11 +86,6 @@ func (t *SimpleChaincode) credit(stub shim.ChaincodeStubInterface, args []string
 	if err != nil {
 		return nil, err
 	}
-
-	// err = stub.PutState(B, []byte(strconv.Itoa(Bval)))
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	return nil, nil
 }
@@ -109,8 +95,8 @@ func (t *SimpleChaincode) debit(stub shim.ChaincodeStubInterface, args []string)
 	fmt.Printf("Running credit")
 	
 	var custName string    // Customer Name
-	var currentBal int //Customer Balance  --Aval->currentBal
-	var debitAmount int          // Transaction value  X->creditAmount
+	var currentBal int //Customer Balance  
+	var debitAmount int          
 	var err error
 
 	if len(args) != 2 {
@@ -121,7 +107,7 @@ func (t *SimpleChaincode) debit(stub shim.ChaincodeStubInterface, args []string)
 
 	// Get the state from the ledger
 	// TODO: will be nice to have a GetAllState call to ledger
-	custCurrentBalbytes , err := stub.GetState(custName)  //Avalbytes ->custCurrentBalbytes
+	custCurrentBalbytes , err := stub.GetState(custName)  
 	if err != nil {
 		return nil, errors.New("Failed to get state")
 	}
@@ -141,11 +127,6 @@ func (t *SimpleChaincode) debit(stub shim.ChaincodeStubInterface, args []string)
 	if err != nil {
 		return nil, err
 	}
-
-	// err = stub.PutState(B, []byte(strconv.Itoa(Bval)))
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	return nil, nil
 }
@@ -170,7 +151,7 @@ func (t *SimpleChaincode) delete(stub shim.ChaincodeStubInterface, args []string
 }
 
 // Invoke callback representing the invocation of a chaincode
-// This chaincode will manage two accounts A and B and will transfer X units from A to B upon invoke
+// This chaincode will manage initialization , credit and delete of transactions.
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
 	fmt.Printf("Invoke called, determining function")
 	
