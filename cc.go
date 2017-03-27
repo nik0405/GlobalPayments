@@ -1,4 +1,4 @@
-/*GlobalPayment POC */
+/*GlobalPayment POC v1.1 */
 
 package main
 
@@ -20,25 +20,37 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string
 	
 	var custName string  	//Customer Name
 	var currentBal int 		//Customer Balance
+	var custAddress string  //Customer address
+	var custAddressKey string  //Customer address key to read write in ledger as key value of address
 	var err error
 
 	//Error for wrong input
-	if len(args) != 2 {
-		return nil, errors.New("Incorrect number of arguments. Expecting 2 arguments -customer name and customer current balance")
+	if len(args) != 3 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2 arguments -customer name ,customer current balance and address")
 	}
 
 	// Initialize the chaincode
 	custName = args[0]
 	currentBal, err = strconv.Atoi(args[1])
+	custAddress = args[2]
+	custAddressKey = args[0] + "Add"
 	//Validate type for balance
 	if err != nil {
 		return nil, errors.New("Expecting integer value for balance")
 	}
 	
 	fmt.Printf("currentBal = %d \n", currentBal)
+	fmt.Printf("customer Address -", custAddress)
+	
+	/* Write the state to the ledger*/
 
-	// Write the state to the ledger
+	//Writing balance with name key
 	err = stub.PutState(custName, []byte(strconv.Itoa(currentBal)))
+		if err != nil {
+		return nil, err
+	}
+	//Writing address with (name+'Add') as a key
+		err = stub.PutState(custAddressKey, []byte(custAddress))
 		if err != nil {
 		return nil, err
 	}
@@ -150,6 +162,36 @@ func (t *SimpleChaincode) delete(stub shim.ChaincodeStubInterface, args []string
 	return nil, nil
 }
 
+//Updates the address
+func (t *SimpleChaincode) updateAddress(stub shim.ChaincodeStubInterface, args []string) ([]byte, error){
+	fmt.Printf("Running updateAddress")
+	
+	var custAddress string
+	var custAddressKey string  //Customer address key to read write in ledger as key value of address
+	var err error
+
+
+	//Error for wrong input
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 2- customer name and new address")
+	}
+	custAddress = args[1]
+	custAddressKey = args[0] + "Add"
+
+	fmt.Printf("new address :", custAddress)
+
+	// Write the state back to the ledger with new address
+	err = stub.PutState(custAddressKey, []byte(custAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	return nil , nil
+
+	
+}
+
+
 // Invoke callback representing the invocation of a chaincode
 // This chaincode will manage initialization , credit and delete of transactions.
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
@@ -171,6 +213,10 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		// Deletes an customer from its state
 		fmt.Printf("Function is delete")
 		return t.delete(stub, args)
+	}else if function == "updateAddress" {
+		//Update Address
+		fmt.Printf("Function is updated address")
+		return t.updateAddress(stub, args)
 	}
 
 	return nil, errors.New("Received unknown function invocation")
@@ -201,7 +247,7 @@ func (t* SimpleChaincode) Run(stub shim.ChaincodeStubInterface, function string,
 }
 
 // Query callback representing the query of a chaincode
-func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte,error) {
 	fmt.Printf("Query called, determining function")
 	
 	if function != "query" {
@@ -209,29 +255,46 @@ func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 		return nil, errors.New("Invalid query function name. Expecting \"query\"")
 	}
 	var custName string // Entities
-	var err error
+	var custAddressKey string  //Customer address key to read write in ledger as key value of address
+	var resp []byte
 
-	if len(args) != 1 {
-		return nil, errors.New("Incorrect number of arguments. Expecting name of the person to query")
+	
+	if len(args) != 2 {
+		return nil, errors.New("Incorrect number of arguments. Expecting name of the person to query and balance or address")
 	}
 
 	custName = args[0]
-
-	// Get the state from the ledger
-	custAvailBalbytes, err := stub.GetState(custName)
-	if err != nil {
-		jsonResp := "{\"Error\":\"Failed to get state for " + custName + "\"}"
-		return nil, errors.New(jsonResp)
+	//Check if balance is the query key
+	if(args[0] == "Balance" ){
+		custAvailBalbytes, err := stub.GetState(custName)
+		if err != nil {
+			jsonResp := "{\"Error\":\"Failed to get state for " + custName + "\"}"
+			return nil, errors.New(jsonResp)
+		}
+		if custAvailBalbytes == nil {
+			jsonResp := "{\"Error\":\"Nil amount for " + custName + "\"}"
+			return nil, errors.New(jsonResp)
+		}
+		jsonResp := "{\"Name\":\"" + custName + "\",\"Amount\":\"" + string(custAvailBalbytes) +"\"}"
+		fmt.Printf("Query Response:%s\n", jsonResp)
+		resp = custAvailBalbytes
+	}else if(args[1]  ==  "Address"){
+		custAddressKey = args[0] + "Add"
+		custAddressbytes, err := stub.GetState(custAddressKey)
+		if err != nil {
+			jsonResp := "{\"Error\":\"Failed to get state for " + custAddressKey + "\"}"
+			return nil, errors.New(jsonResp)
+		}
+		if custAddressbytes == nil {
+			jsonResp := "{\"Error\":\"No address for " + custName + "\"}"
+			return nil, errors.New(jsonResp)
+		}
+	    jsonResp := "{\"Name\":\"" + custName + "\",\"Address\":\"" + string(custAddressbytes) +"\"}"
+		fmt.Printf("Query Response:%s\n", jsonResp)
+		resp = custAddressbytes
 	}
-
-	if custAvailBalbytes == nil {
-		jsonResp := "{\"Error\":\"Nil amount for " + custName + "\"}"
-		return nil, errors.New(jsonResp)
-	}
-
-	jsonResp := "{\"Name\":\"" + custName + "\",\"Amount\":\"" + string(custAvailBalbytes) + "\"}"
-	fmt.Printf("Query Response:%s\n", jsonResp)
-	return custAvailBalbytes, nil
+	
+	return resp, nil
 }
 
 func main() {
